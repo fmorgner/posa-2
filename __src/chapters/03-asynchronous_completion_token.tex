@@ -1,0 +1,48 @@
+\chapter{Asynchronous Completion Token}
+
+\section{Context}
+Ein System, dass asynchron Operationen auf Services ausführt und dann die Ergebnisse auswerten will.
+
+\section{Problem}
+Wenn ein Client etwas auf einem Service ausführt und dann mit dem Ergebnis etwas anfangen will, sollte der Client entscheiden, wie er das machen will und nicht der Service. z.B. Weiss der Service nicht auf welchem Thread der Client das Callback ausführen möchte. Theoretisch könnte man ja bei jedem Service-Call im Callback alle Informationen mitgeben um das Callback auf dem richtigen Thread usw. auszuführen. Dies würde aber zu einem massiven Overhead in der Kommunikation führen und das ganze System verlangsamen. Auch beim Client muss die Geschwindigkeit stimmen und darum sollte dieser nicht in einer Tabelle o.ä. nach den Eventhandlern suchen sollen.
+
+\section{Solution}
+\begin{itemize}
+  \item \textbf{Client}: Führt eine asynchrone Operation des Service aus
+  \item \textbf{Service}: Stellt eine Funktionalität zur Verfügung
+  \item \textbf{ACT} : Ist ein Wert welcher den Zustand und die Aktionen definiert die der Client braucht, um das Resultat einer asynchronen Operation, zu verarbeiten
+\end{itemize}
+
+\begin{figure}[H]
+  \centering
+  \includesvg[width=0.4\textwidth]{03-asynchronous_completion_token-sequence-diagram}
+  \caption{Sequenzdiagramm f\"ur Asynchronous Completion Token}
+\end{figure}
+
+Der Client kennt den Context und kennt den auzuführenden Completion Event Handler. Deshalb wird beim Ausführen der asynchronen Operation vom Client ein Token erstellt, welches diese Informationen enthält, dieses wird beim Operationaufruf dem Service mitgeschickt. Nun kann der Client weiterarbeiten und der Service führt die Operation aus. Wenn der Service fertig ist wird das Token und das Ergebnis zurück an den Client zurückgeschickt. Auf Grund des Tokens kann der Client schnell entscheiden welcher Event Handler aufgerufen werden soll.
+
+\section{Consequences}
+\begin{itemize}
+    \pro{Einfachere Datenstruktur beim Client - man braucht nicht mehr grosse Konstrukte um die Zuordnung von Actions zu Responses zu handlen.}
+    \pro{Effizienz: ACTs sind zeit-effizient, da es nicht langwieriges Parsing von komplexen Daten benötigt, welches mit der Response zurückgegeben werden}
+    \pro{"Platzsparend": ATCs können sehr klein sein, aber grosse Mengen an Information repräsentieren. Beispielsweise in C: void-Pointer kann 4 bytes gross sein aber auf ein beliebig grosses Konstrukt zeigen}
+    \pro{Flexibel: change the association from response to a new action by editing the ACT}
+    \pro{Einfach bei Concurrency-Issues: selbst langandauernde Operationen können mit ACT verwendet werden, weil es einfach ist, den Status aus den übergebenen Daten wiederherzustellen.}
+    \pro{Separation of Concerns: Was nach der Erledigung eines Tasks beim Client gemacht werden muss, ist dessen Aufgabe und kann dieser auch frei bestimmen.}
+    \con{Memory Leaks: Können auftreten, wenn der Client ACTs als Pointers benutzt und auf dynamisch allozierten Speicher zeigt und das Token "verloren" geht oder der Service abstürzt. Kann gefixt werden indem der Client separaten Speicherbereich für ACT benutzt, welcher explizit vom GC behandelt wird wenn die Verbindung fehlschlägt.}
+    \con{Re-Mapping: Wieder bei Pointer. Errors können auftreten, wenn Teile der Applikation ins Virtuelle Memory verschoben werden. Beispielsweise bei Restarts nach Abstürzen.}
+    \con{Authentifizierung: Wenn ACT zurückgegeben wird, muss der Client möglicherweise den Inhalt überprüfen, wenn er dem Service nicht traut.}
+\end{itemize}
+
+\section{Known Uses}
+\begin{itemize}
+    \item die meisten Betriebssysteme -> Eine Anwendung ruft verschiedene asynchrone Operationen (zb Netzwerk-Aufrufe oder File I/O) auf. Die Ergebnisse werden in einen "I/O completion port" gelegt wo sie durch den "GetQueuedCompletionStatus" - system call abgeholt werden koennen.
+    \item Cookie im Browser: der Webserver agiert als Client und der Browser als Service. Beim Besuch der Website erstellt Webserver (Client) den Token mit SessionID. Der Service, also der Browser, kann nun seine Aufgaben erledigen, also die Seite auch wieder verlassen. Beim Wiederkommen des Browsers zum Webserver, also nach der Completion, sendet der Browser sein Token mit der SessionID mit. Der Webserver (Client) kann dann mit dieser ihm bereits bekannten Information etwas anfangen. (zb dem Webseitenbesucher den korrekten Warenkorb anzeigen)
+\end{itemize}
+\section{Relationships}
+\begin{itemize}
+  \item MEMENTO
+  \item PROACTOR
+  \item REACTOR
+\end{itemize}
+
