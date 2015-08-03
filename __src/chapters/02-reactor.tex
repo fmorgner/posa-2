@@ -1,0 +1,44 @@
+\chapter{Reactor}
+
+\section{Context}
+Eine Eventgesteuerte Applikation erhält gleichzeitig mehrere Service Anfragen, diese werden schlussendlich jedoch seriell verarbeitet.
+
+\section{Problem}
+Ein Server bekommt parallel Anfragen von verschiedenen Clients. Diese lösen einen spezifischen Event aus z.B. CONNECT oder READ. Der Server soll auf Grund des Events den richtigen Eventhandler aufrufen. Dafür muss die Applikation den Event demultiplexen und dispatchen können. Folgende Probleme sollten dabei berücksichtigt werden:
+\begin{itemize}
+  \item \textbf{Availability}: Der Server muss für jede Anfrag erreichbar sein, auch wenn er noch auf andere Anfragen wartet. Er darf also nicht blockieren.
+  \item \textbf{Efficiency}: Um den Durchsatz zu maximieren sollten unnötige Contextwechsel(Thread oder Prozess), Synchronisationen und das Verschieben von Daten verzichtet werden.
+  \item \textbf{Adaptability}: Das Integrieren von neuen Diensten (Event Handlers) sollte minimalen Aufwand am Demultiplexing und Dispatching-Mechanismus erfordern.
+  \item \textbf{Programming simplicity}: Der Programmcode sollte keine komplizierten Concurrency-Strategien enthalten.
+  \item \textbf{Portability}: Der Server sollte ohne signifikanten Aufwand auch auf einer aneren OS Platform laufen
+\end{itemize}
+
+\section{Solution}
+\begin{figure}[H]
+  \centering
+  \includesvg[width=0.6\textwidth]{02-reactor-class-diagram}
+  \caption{Strukturdiagramm f\"ur Reactor}
+\end{figure}
+
+\section{Consequences}
+\begin{itemize}
+    \pro{Separation of Concerns. Demultiplexing Komponenten sind von den Hooks der Handler getrennt.}
+    \pro{Erweiterbarkeit. Es können jederzeit neue Handlertypen hinzugefügt werden können. z.B. Acceptors, Connectors, etc.}
+    \pro{Synchronisation von Resourcen nicht mehr nötig, da nur 1 Thread}
+    \con{Nur einfach möglich, wenn Betriebssystem demultiplexing unterstützt.}
+    \con{Nur sinvoll für kleine Operationen. Bei grösseren Sachen, sollte das Eventhandling in separaten Threads erfolgen.}
+    \con{Debugging schwierig}
+\end{itemize}
+
+\section{Known Uses}
+\begin{itemize}
+    \item Twisted
+    \item Node.js
+    \item JBoss Netty
+\end{itemize}
+
+\section{Relationships}
+\begin{itemize}
+  \item OBSERVER
+\end{itemize}
+
