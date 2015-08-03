@@ -1,0 +1,87 @@
+\chapter{Interceptor}
+
+\section{Context}
+Ein Framework, das keine Erweiterungsmöglichkeiten bietet.
+
+\section{Problem}
+Wenn ein Framework gebaut wird, ist es unmöglich jede Funktionalität einzubauen, die jemals von irgendwem gewünscht werden wird. Es ist auch keine Option, das Framework komplett zu öffnen, damit jeder direkt im Core arbeiten kann, nur um ein gewünschtes Verhalten zu erzwingen.
+
+Schauen wir uns als Beispiel einen kleinen Teil eines Web-Frameworks an, welches einen Mailversand-Service anbietet. Wir können unmöglich wissen, was die Nutzer später alles damit machen wollen, z.B. Verschlüsselung, Filtern gewisser Inhalte, automatisches Anfügen einer Signatur, usw. Würden wir nun alle oben genannten Funktionalitäten einbauen, würde es das Verwenden eines solchen Services viel schwieriger machen und nur ein kleiner Prozentsatz der Nutzer würden jemals die gesamte Funktionalität nutzen.
+
+\section{Solution}
+Das Framework erlaubt es den es verwendenden Applikationen, vordefinierte Interfaces zu implementieren, welche vom Framework automatisch beim Auftreten von gewissen Events getriggert werden. Über die Klassen (Interceptors), welche die Interfaces implementieren, können die hinter den Events steckenden Mechanismen erweitert, verändert oder sogar abgefangen (engl. intercept) werden.
+
+Damit die Interceptors überhaupt etwas bewerkstelligen können, braucht es einen Kontext. Dort werden Daten zwischengespeichert, welche die Interceptors benutzen können und die üblicherweise mit dem originalen Event zusammenhängen.
+
+\subsection{Structure}
+\begin{figure}[H]
+  \centering
+  \includesvg[width=0.4\textwidth]{01-interceptor-class-diagram}
+  \caption{Strukturdiagramm f\"ur Interceptor}
+\end{figure}
+Es werden für die Implementation einige (zusätzliche) Komponenten benötigt:
+
+\subsubsection{Interceptor-Interface}
+Stellt eine oder mehrere Operationen zur Verfügung, weche durch den Dispatcher beim Triggern des spezifizierten Events aufgerufen werden, sogenannte Hooks.
+\subsubsection{konkrete Interceptor-Klassen}
+Implementieren die erwähnten Hooks.
+\subsubsection{Kontext}
+Kann zur "Kommunikation" zwischen Interceptors, der Applikation und Framework benutzt werden, etwa durch Accessor- und Mutator-Methoden. Über erstere werden Informationen vom Framework bereitgestellt, über letztere werden Daten darauf mutiert.
+\subsubsection{Dispatcher}
+Wird im Framework definiert und dient als Registrator, wo Applikationen konkrete Interceptors beim konreten Framework an- oder abmelden können.
+
+
+\section{Consequences}
+\begin{itemize}
+    \pro{Erhöhung der Flexibilität und Erweiterbarkeit}
+    \pro{Entkopplung der Kommunikation zwischen Sender und Empfaenger des Interceptor-Requests. Das erlaubt jedem Interceptor sogar waehrend der Laufzeit den Request "anzusehen" und eventuell Funktionalitaet des Systems zu veraendern.}
+    \pro{Funktionalitaet kann einfach dem System zugefuegt werden, um dynamisch sein Verhalten zu veraendern.}
+    \con{Der Haupnachteil, sagt man, ist der Anstieg der Komplexitaet im Design. Je mehr Interceptors im System ge-hooked sind, desto groesser wird das Interface.}
+    \con{Durch die Offenheit und Erweiterbarkeit des Systems, kann man argumentieren, dass dadurch potentielle Schwachstellen existieren.}
+    \con{Im schlimmsten Fall kann ein Interceptor-Loop entstehen, welcher erst zur Laufzeit bemerkt wird und schwierig zu finden ist.}
+\end{itemize}
+
+\section{Known Uses}
+Dieses Pattern wird unter anderem im besten Web-Framework der Neuzeit verwendet (Ruby on Rails (RoR) :-)
+
+Nehmen wir an, wir entwickeln gerade eine RoR-Applikation und möchten nicht, dass während der Entwicklungsphase E-Mails an Nutzer verschickt werden. Der Action-Mailer, also der Mailversand-Service von RoR, bietet die Möglichkeit, einen Interceptor zu registrieren um vor dem Versand eines Mails dieses noch bearbeiten zu können.
+
+Dazu muss der Programmierer nur 2 Dinge tun:
+\begin{itemize}
+    \item{Eine Klasse schreiben, die das Interceptor-Interface implementiert. (Concrete-Interceptor)
+      \begin{lstlisting}[language=Ruby]
+class MyConcreteInterceptor
+
+  def self.delivering_email(message)
+      message.to = developer@my-company.com
+  end
+
+ end\end{lstlisting}
+}
+    \item{Den Interceptor beim Framework (Dispatcher) registrieren.
+      \begin{lstlisting}[language=Ruby]
+ActionMailer::Base.register_interceptor(MyConcreteInterceptor)if Rails.env.development?\end{lstlisting}
+}
+
+  \end{itemize}
+
+
+\section{Relationships}
+\begin{itemize}
+  \item Hollywood Principle: "Don't call us, we'll call you."
+  \item GoF: Template Method Pattern
+  \item GoF: Chain of Responsibility - Ohne Dispatcher, als Kette von "Interceptors"
+  \item Decorator Pattern: Funktionalität wird durch Decorator erweitert
+\end{itemize}
+
+\section{Exam Questions}
+\begin{itemize}
+  \item Es ist die Aufgabe des Dispatchers, den Event zu untersuchen und herauszufinden welche Interceptors benachrichtigt werden sollen - JA
+  \item Das POSA Interceptor Design Pattern ist eine Variante von Chain of Responsibility (GoF) - NEIN
+\end{itemize}
+
+\begin{additional}[Links]
+  \begin{itemize}
+    \item \url{http://www.inf.usi.ch/carzaniga/debs04/debs04curry.pdf}
+  \end{itemize}
+\end{additional}
