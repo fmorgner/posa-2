@@ -1,0 +1,57 @@
+\chapter{Proactor}
+
+\section{Problem}
+Ein intuitiver Weg, einen Concurrent-Webdienst anzubieten ist wohl ein synchrones Multithreading, welche concurrent Requests entgegennimmt und diese in individuellen Threads verarbeitet (aehnliches Problem wie der Reactor). Das heisst, jeder Thread muss eine Verbindung aufbauen und diese separat managed. Also blockiert jede Operation (??) bis sie fertig ist.
+Man moechte neben der concurrency vor allem noch andere 3 Punkte beachten: 1: Efficiency: minimale Latenzzeit, maximaler Datendurchsatz, sinnlose CPU Besetzzeit minimieren 2: Programmier-Einfachheit: Design des Servers sollte den Gebrauch einer effizienten Concurrency-Strategie vereinfachen. 3: Adaptability: (Scalability): veraenderte Transport-Protokolle sollten nicht allzu grosse Unterhaltungsarbeiten mit sich ziehen
+
+\section{Solution}
+\subsection{Structure}
+\begin{figure}[H]
+  \centering
+  \includesvg[width=0.8\textwidth]{04-proactor-class-diagram}
+  \caption{Strukturdiagramm f\"ur Proactor}
+\end{figure}
+
+\textbf{Der Initiator} ist der Verwender des Proactor-Frameworks. Er erstellt eine Operation, sowie einen Completion-Event-Handler, welcher er dem Asynchronous Operation Processor übergibt. z.B. mit ExecuteAsync(operation, callback). Die "starts"-Verbindung auf der oberen Graphik kann vernachlässigt werden.
+
+\textbf{Der Asynchronous Operation Processor} führt alle erhaltenen Operationen aus und verwendet dazu ggf. einen Thread-Pool um sie nebenläufig auszuführen. Wenn eine Operation abgeschlossen ist, pusht er den dazugehörigen Completion-Event-Handler(Callback) und das Ergebnis der Operation auf die Completion Event Queue.
+
+\textbf{Der Asynchronous Event Demultiplexer} wird vom Proactor verwendet um die wartenden Completion-Event-Handlers aus der Queue zu holen und sie sequentiell auszuführen. Somit müssen die Callbacks nicht Thread-Safe gebaut werden.
+
+Wichtig ist auch noch, dass das Betriebssystem oftmals den Asynchronous Operation Processor, die Completion Event Queue und den Asynchronous Event Demultiplexer zur Verfügung stellt und nur der Proactor ausprogrammiert werden muss.
+
+\section{Consequences}
+\begin{itemize}
+    \pro{Separation of Concerns: Die Andwendungslogik wird von der asynchronen Operation getrennt. Somit ist die asynchrone Operation wiederverwendbar.}
+    \pro{Portabilität: Die asynchrone Operation ist meistens Betriebssystem unabhängig.}
+    \pro{Performance \& Scalability: Man kann unnötiges Context Switchting vermeiden. Zudem braucht man nicht viele Threads zu erstellen um die Concurrency zu verbessern.}
+    \pro{Simplified application synchronisation: Die Completion Handler können so geschrieben werden, als ob sie in einem single-threaded environment sind und brauchen somit keine oder nur wenig Berücksichtigung von Synchronisation. Dies erfordert natürlich das der Proactor nicht mehrere Threads startet.}
+    \con{Scheduling \& Controlling: Die Reihenfolge der Ausführung kann auf Grund der Asynchronität kaum beeinflusst werden. Auch ist es schwer ansychron gestartete Aufgaben wieder zu terminieren.}
+    \con{Complexity: Durch den Zeitabstand zwischen Ausführung und Completion ist es komplizierter Applikationen zu entwickeln. Zudem wird das Debugging erschwert, da die Events nicht deterministisch sind.}
+\end{itemize}
+
+\section{Known Uses}
+Ein typisches Beispiel ist der Web-Server, welcher eine grosse Anzahl Client-Anfragen gleichzeitig bearbeiten will.
+
+Ein einfacher GET-Request durchläuft den "Loop" mehrere Male. Der HTTP-Handler dient als Initiator und Completion Handler zugleich.
+\begin{enumerate}
+  \item Der Browser stellt die Anfrage an den Webserver.
+  \item Der Request wird gelesen, bei der Completion wird der Read-Complete-Event in die Evente-Queue gestellt und
+  \item via Proactor an den HTTP-Handler weitergegeben ( handle\_event wird aufgerufen mit dem READ-EVENT als Parameter ).
+  \item Der HTTP-Handler liest den Request, indem die Schritte 2-4 solange durchgeführt werden bis der Request komplett gelesen wurde.
+  \item Nach dem vollständigen Lesen und Validieren des Requests ruft der HTTP-Handler eine asynchrone Write-Funktion vom entsprechenden File auf den entsprechenden Socket auf.
+  \item Diese Operation wird an das OS geschickt mit einem ACT (siehe letze Woche) (mit Verweis auf sich selbst) sowie dem Verweis auf das File als Parameter. So weiss der Proactor danach, wen er zu beanchrichtigen hat, wenn die Operation komplett ist.
+  \item Wenn die Operation (asynchrones Schreiben) abgeschlossen ist, wird ein Write-Completion-Event in die Completion Event Queue geschrieben. Der Proactor liest dies aus (mit der Windows-Methode GetQueuedCompletionStatus()) um den Event aus der Queue zu holen.
+  \item Über das ACT weiss der, dass der obige HTTP-Handler für diesen Event zuständig ist und ruft darauf handle\_event auf, mit WRITE\_EVENT als Parameter (=hook-Methode).
+    Dies wird solange wiederholt, bis das komplette File an den Webbrowser geschickt wurde.
+\end{enumerate}
+
+\section{Relationships}
+\begin{itemize}
+  \item ACT
+  \item REACTOR
+  \item ACTIVE OBJECT
+  \item CHAIN OF RESPONSIBILITY
+  \item SINGLETON
+\end{itemize}
+
