@@ -1,0 +1,5 @@
+#!/bin/sh
+
+fname="./__src/chapters/$(ls __src/chapters | wc -l)-${1}.tex"
+cp -i "./templates/chapter.tex" "${fname}"
+vim -c 'set ft=tex' "${fname}"

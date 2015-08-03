@@ -1,0 +1,52 @@
+\chapter{Wraper Facade}
+
+\section{Context}
+Objektorientierte, High-Level-Software die Low-Level- und plattformgebundene APIs verwenden muss.
+
+\section{Problem}
+Auch heute noch verwenden viele Applikationen ein User-Interface, eine Datenbank oder Netzwerk-/Thread-APIs, die plattformgebunden sind. Dies führt zu folgenden Problemen:
+
+\subsection{Wartbarkeit und Erweiterbarkeit}
+Grundsätzlich ist Code ohne High-Level Features wie z.B. Konstruktoren, Exceptions und Garbage-Collection schwieriger zu verstehen, zu warten und zu erweitern.
+
+Compiler-Direktiven erhöhen die Schwierigkeit noch zusätzlich.
+
+\subsection{Plattformunabh\"angigkeit}
+Durch die zunehmende Beliebtheit von mobilen Geräten ist die Portabilität von Software ebenfalls immer wichtiger geworden. Eine Applikation, bei der alle Layers von der Plattform abhängig sind, ist kaum wünschenswert. Daher sollte vor allem der DAL (Data Access Layer) und der Businesslayer (welcher oft den grössten Codeanteil enthält) portierbar sein. Wenn die Datenbankanbindung, die Netzwerkservices oder das Thread-Handling Low-Level-APIs verwendet, kann dies nicht mehr gewährleistet werden.
+
+Sollte die Plattformunabhängigkeit durch Compiler-Direktiven erzwungen werden, so muss dies an allen Stellen wiederholt werden, wo die API mit einer anderen Konfiguration verwendet werden soll.
+
+\subsection{Fehleranf\"alligkeit}
+Die Verwendung von Low-Level-APIs benötigt meist spezifisches Wissen, da oft Methoden in einer gewissen Reihenfolge aufgerufen werden müssen oder plattformspezifisches Know-How erforderlich ist. Sollten diese APIs immer wieder von mehreren Entwicklern verwendet werden müssen, steigt das Risiko für eine falsche Verwendung.
+
+\section{Solution}
+Verschiedene bekannte Software Patterns sprechen dasselbe Problem an, lösen es jedoch nicht. Die Verwendung von Indirektion (auch 'Weiterleitung'), wie es häufig im Software Engineering gemacht wird, wird auch hier verwendet, in Form einer Fassade. Dies sorgt auch für Low Coupling zwischen Client (Application) und aufgerufener API, welche z.B. Platformabhängig sein kann. Im vergleich zu der GoF-Facade, kapselt die Wrapper-Facade aber keine objektorientierte Subsysteme, sondern vielmehr lower-level nicht-objektorientierte API's. Ähnlichkeiten: - Facade - Decorator: erweitert ein Objekt dynamisch, indem es ihm zusätzliche Verantwortlichkeit zuweist - Adapter und Bridge: bieten ebenfalls Indirektion, sind aber ungeeignet um ein nicht-objektorientiertes Subsystem zu kapseln.
+
+\subsection{Structure}
+Funktionen und die Wrapper-Facade: Teile der Pattern-Struktur sind die low-level Funktionen der dahinterliegenden API und die Fassade, welche aus Einer, sowie auch aus mehreren Klassen bestehen kann und die dahinterliegenden Funktionen und/oder damit verbundene Datenstruktur kapselt. Die low-level Funktionen werden also nicht direkt angesprochen.
+
+\begin{figure}[H]
+  \centering
+  \includesvg[width=0.8\textwidth]{00-wrapper_facade-sequence-diagram}
+  \caption{Sequenzdiagram f\"ur Wrapper Facade}
+\end{figure}
+
+\section{Known Uses}
+Auf der JVM ( Java Virtual Machine ) ist der Einsatz vom Wrapper Facade-Pattern verbreitet, um die Java-Programme portabel auf unterschiedlichen Plattformen lauffähig zu machen.
+
+\section{Consequences}
+\begin{itemize}
+    \pro{Das Kapseln von Low-Level-APIs mit dem Pattern führt zu prägnanten, zusammenhängenden und robusten OO-Interfaces. (Code Qualität) Fehler wie das Vergessen von Parametern oder Methodenaufrufen können dadurch verhindert werden.}
+    \pro{Portabilität und Wartbarkeit: Das Pattern schützt den Programmierer vor nicht-portablen Aspekten einer Low-Level-API. Zudem werden auf Konfigurationsfiles und \textbf{ifdefs} verzichtet und logische Entitäten wie Klassen, Subklassen und deren Beziehungen verwendet.}
+    \pro{Wiederverwendbar, Modular: Klassen können an verschiedenen Stellen wieder eingesetzt werden.}
+    \con{Jede Abstraktionsschicht bringt das Risiko eines Funktionsverlusts mit sich. Es können nicht alle Use Cases abgedeckt werden, denn zum Teil ist eine Abstraktion nicht möglich ohne dabei unverhältnismässig viel Code zu generieren.}
+    \con{Performanceverlust durch indirekten Aufruf der Methoden der Low-Level-API. Hierbei entsteht ein Overhead. Bei Sprachen, welche Inlining unterstützen ist dieser Overhead zu vernachlässigen.}
+    \con{Einschränkungen durch Programmiersprachen und Kompiler. Der Zugriff von C++ auf eine in C geschriebene API ist relativ unkompliziert, da die Sprache und die entsprechenden Kompiler Features definieren, welche cross-language Integration ermöglichen. Bei anderen Programmiersprachen könnte dies zu Problemen führen, da zum Teil nicht-portable Mechanismen verwendet werden müssen um die Wrapper Facade zu entwickeln.}
+\end{itemize}
+
+\section{Exam Questions}
+\begin{itemize}
+  \item Behauptung: Eine Wrapper Facade muss immer die vollständige Funktionalität der zugrunde liegenden API abdecken. (Falsch - zum Teil ist es nicht möglich eine Funktionalität zu abstrahieren ohne dabei übertrieben viel Code zu generieren)
+  \item Behauptung: Java.io Stream Implenetationen sind ein typisches Beispiel für Wrapper Facade. (Richtig)
+  \item Gibt es beim Implementieren der Wrapper Facade Einschränkungen bei der Auswahl der Programmiersprache? (Ja)
+\end{itemize}
