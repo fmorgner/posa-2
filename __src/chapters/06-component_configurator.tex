@@ -1,0 +1,50 @@
+\chapter{Component Configurator}
+
+\section{Context}
+Eine Applikation/System, worin Komponenten so flexibel und transparent wie möglich initialisiert, pausiert, reaktiviert und beendet werden müssen.
+
+\section{Solution}
+Wir trennen die Interfaces der einzelnen Komponenten von den konkreten Implementation und machen die Applikation unabhängig davon, wann die Implementationen innerhalb der Applikation konfiguriert wurden.
+
+Genauer: Eine Komponente definiert ein einheitliches Interface für Konfiguration und Kontrolle des Services oder Funktionalität das es bereitstellt.
+
+Konkrete Komponenten implementieren dieses Interface. Applikationen/Programmierer können konrete Interfaces nutzen, um konkrete Komponenten dynamisch zu initiieren, zu pausieren, fortzusetzen und zu terminieren, aber auch um Informationen über die Komponente zu erhalten.
+
+Konrete Komponenten sind in passende Konfigurationseinheiten verpackt, z.B. eine DLL (Dynamically Linked Library). So eine DLL kann dynmisch über einen Komponentenkonfigurator eingebunden/entfernt werden. Dieser benutzt eine Liste, um alle konkreten Komponenten einer Applikation zu verwalten.
+
+\subsection{Structure}
+4 Elemente:
+\begin{itemize}
+  \item Component: Definiert das einheitliche Interface, über welches der Service, welcher von den Implementation dieser Komponenten angeboten wird, konfiguriert und kontrolliert werden kann.
+  \item Concrete Component: Implementieren das Interface der entsprechenden Component. Bietet auch gewisse Funktionen für die Applikation an, z.B. Datenverarbeitung o.Ä. Ist meistens in einem Paket "verpackt", welches dynamisch zur Laufzeit eingebunden/entfernt werden kann, z.B. DLL.
+  \item Component Repository: Verwaltet alle concrete Components welche momentan in der Applikation eingebunden sind. Das Repository erlaubt es der Applikationsverwaltung oder dem Administrator, das Verhalten der Applikation oder anderen Komponenten einfach anzupassen.
+  \item Component Configurator: Benutzt das Component Repository, um die Konfiguration von concrete components vorzunehmen.
+\end{itemize}
+
+\begin{figure}[H]
+  \centering
+  \includesvg[width=0.6\textwidth]{06-component_configurator-class-diagram}
+  \caption{Strukturdiagramm f\"ur Component Configurator}
+\end{figure}
+
+Wenn neue Komponenten hinzukommen oder entfernt werden, möchten bestehende Komponenten davon informiert werden, so dass sie mit der betroffenen Komponente interagieren oder damit aufhören können!
+
+\section{Consequences}
+\begin{itemize}
+    \pro{Einheitlichkeit: Komponenten werden wie Bausteine behandelt, welche dem gleichen Muster folgen. Ein gemeinsames Interface sorgt dafür, dass sie sich gleich verhalten und der Verwaltungsaufwand minimiert wird.}
+    \pro{Zentrale Verwaltung: Komponenten können gruppiert und von einem Ort aus verwaltet werden.}
+    \pro{Wartbarkeit: Durch das Forcieren von der Bündelung von Funktionalitäten in Module (Komponenten) wird die Software wartbarer, da Änderungen nur an einer Stelle vorgenommen werden müssen. Wenn z.B. eine Hash-Funktion unbrauchbar wird (MD5), muss diese nur im entsprechenden Hash-Modul ausgewechselt werden, nicht bei allen Orten wo sie verwendet wird.}
+    \pro{Testbarkeit: einzelne Module sind definitiv einfacher testbar als Code welcher überall verwendet wird.}
+    \pro{Reusability: Wenn die gleichen Schnittstellen in einer anderen Applikation verwendet werden, können die gleichen Komponenten ohne grossen Aufwand portiert werden.}
+    \con{Determinismus: Es ist schwer, das Verhalten im Voraus zu bestimmen, ohne dass die Komponenten zur Laufzeit fertig initialisiert wurden. Es können Abhängigkeiten zwischen den einzelnen Komponenten bestehen welche das Verhalten einer einzelnen Komponente stark beeinflusst. Dies können sowohl Funktionalitäten sein, sowohl als auch Ressourcen, z.B. wenn eine neue Komponenten sehr viel Prozessorleistung benötigt kann es sein, dass andere Komponenten "verhungern" und Deadlines überschreiten.}
+    \con{Sicherheit: Eine Applikation, welches dieses Pattern einsetzt *kann* weniger sicher oder zuverlässig sein. Z.B. kann eine Komponente mit Fehlern die ganze Applikation gefährden.}
+    \con{Overhead: Das Speichern von Komponenten in der Komponentenliste erzeugt einen kleinen Overhead, was bei zeitkritischen Systemen unerwünscht sein kann.}
+\end{itemize}
+
+\section{Known Uses}
+\begin{itemize}
+  \item Sport-Teams: Der Trainer (Component Configurator) kann Spieler (Components) oftmals auswechseln, ohne dass das Spiel pausiert oder neu gestartet werden muss. Die Spielerliste entspricht dabei dem Component Repository.
+  \item Software Verwaltung eines Bestriebssystems (Apt, Pacman, Homebrew, etc.)
+\end{itemize}
+
+
