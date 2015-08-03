@@ -30,7 +30,6 @@ Kann zur "Kommunikation" zwischen Interceptors, der Applikation und Framework be
 \subsubsection{Dispatcher}
 Wird im Framework definiert und dient als Registrator, wo Applikationen konkrete Interceptors beim konreten Framework an- oder abmelden können.
 
-
 \section{Consequences}
 \begin{itemize}
     \pro{Erhöhung der Flexibilität und Erweiterbarkeit}
@@ -64,6 +63,13 @@ ActionMailer::Base.register_interceptor(MyConcreteInterceptor)if Rails.env.devel
 }
 
   \end{itemize}
+  Wenn nun ein Mail-Event ausgelöst wird, iteriert der Dispatcher (hier Actionmailer-Klasse) über die registrierten Interceptors und übergibt diesen das Message-Object. Diese können es bearbeiten, was (gewünschte) Seiteneffekte verursachen kann, und das Framework kann nach Beendigung mit dem Versenden fortfahren.
+
+\subsection{Other Known Uses}
+\begin{itemize}
+  \item Web Browsers fuer die Plug-In Integration
+  \item Web Servers (z.B. Apache 2.0) um Modulen zu erlauben, Handlers (Interceptors) am Core-Server zu registrieren.
+\end{itemize}
 
 
 \section{Relationships}
