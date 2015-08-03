@@ -1,0 +1,51 @@
+\chapter{Acceptor Connector}
+
+\section{Summary}
+Das Acceptor-Connector Pattern trennt den Verbindungsaufbau zwischen zwei Peer-Services und der Verarbeitung, welche bei bestehender Verbindung durchgeführt wird.
+
+\section{Context}
+Ein serviceorientiertes verteiltes Client-Server System.
+
+\section{Problem}
+\begin{itemize}
+  \item Aufteilung von Kommunikations- und Verbindungs-Komponenten In einem verteilten System kommt es oft vor, dass Service-Schnittstellen verändert werden, Connection-Schnittstellen bleiben aber eher stabil und ändern sich wenig. Sie sollten deshalb getrennt sein um eine einfache Erweiterbarkeit zu gewährleisten.
+  \item Rollentausch nach Verbindungsaufbau Eine generell wichtige Festellung ist, dass sich die Begriffe "Client" und "Server" auf die Kommunikationsrollen beziehen. Beim Verbindungsaufbau(Verbindungsrollen), kann es aber genau umgekehrt sein, da der Server auf neue Clients wartet welche Daten liefern um eine Verbindung aufzubauen. Es sollte deshalb für verschiedene Rollen auch getrennte Komponenten geben.
+  \item High-Level vs. Low-Level Für den Verbindungsaufbau werden oft Low-Level Komponenten benötigt z.B. Sockets. Der Service benötigt aber eher weniger Low-Level Komponenten.
+\end{itemize}
+
+\section{Solution}
+\begin{figure}[H]
+  \centering
+  \includesvg[width=0.7\textwidth]{05-acceptor_connector-acceptor-sequence-diagram}
+  \caption{Sequenzdiagramm f\"ur Acceptor Connector mit einem Acceptor}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includesvg[width=0.6\textwidth]{05-acceptor_connector-connector-sequence-diagram}
+  \caption{Sequenzdiagramm f\"ur Acceptor Connector mit einem Connector}
+\end{figure}
+
+\section{Consequences}
+\begin{itemize}
+    \pro{Reusability, Portability, Extensibility}
+    \pro{Robustness: durch die starke Trennung vom Service Handler und dem Acceptor wird ein zusätzlicher Schutz vor unbeabsichtigtem Lese- oder Schreibzugriff bei einer passiven Verbindung eingebaut}
+    \pro{Efficiency: Es können gut Verbindungen mit sehr vielen Hosts asynchron und effizient über Verbindungen mit langen Latenzen aufgebaut werden. Satellitenverbindungen brauchen für einen 3-way-TCP-Handshake teilweise bis zu einigen Sekunden, hier ist nicht mehr an synchrone Verbindungen zu denken.}
+    \con{Zusätzliche Umleitung: Nicht wirklich relevant in Sprachen mit parametrisierten Typen, hier kann das Pattern mit relativ wenig Overhead implementiert werden. Es ist aber doch ein Schritt mehr, der gemacht werden muss.}
+    \con{Zusätzliche Komplexität: Für kleinere Anwendungen mit z.B. nur einem Client und einem Service kann das Pattern zu komplex sein. Aber auch hier kann der Gebrauch von Acceptor- und Connector-Wrapper-Facaden den Programmierer vor fehleranfälligen Low-Level-Geschichten schützen.}
+
+\end{itemize}
+\section{Known Uses}
+\begin{itemize}
+  \item UNIX "superservers": Benutzt "Master Connector" um auf Verbindungen auf einem Set von Comm-Ports zu hören. Services: FTP, Telnet.
+  \item CORBA ORB (Object Request Broker)
+  \item Web-Browser: Benutzen asynchrone Version um mehrere HTTP-Verbindungen zu öffnen. So wird der Main-Loop des Browsers nicht geblockt.
+  \item "Manager und Sekretärin": Herr Blocher hat keine Zeit, um Frau Merkel selbst anzurufen und dann zu warten bis sie Zeit hat. Er beauftragt seine (hübsche) Sekretärin, den (hübschen) Sekretär von Frau Merkel anzurufen. Wenn sie ihn am Apparat hat, geben beide die Verbindung weiter an ihre Vorgesetzten. Die hübsche Sekretärin ist hier der Connector, der hübsche Sekretär ist der Acceptor und die beiden Politiker sind Service Handlers.
+\end{itemize}
+
+\section{Relationships}
+\begin{itemize}
+  \item CLIENT-DISPATCHER-SERVER
+  \item PROACTOR
+  \item REACTOR
+  \item WRAPPER FACADE
+\end{itemize}
