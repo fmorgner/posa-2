@@ -1,0 +1,44 @@
+\chapter{Thread Safe Interface}
+
+\section{Summary}
+Das Threadsafe Interface Design-Pattern minimiert den Overhead von Locking und stellt sicher, dass komponenteninterne Methodencalls nicht gegenseitig einen Deadlock verursachen, indem sie versuchen, ein Lock (wieder) zu "ergattern", welches bereits von der Komponente blockiert ist.
+
+\section{Context}
+Komponenten in Multithreaded-Applikationen welche komponenteninterne Methodenaufrufe beinhalten.
+
+\section{Problem}
+Multi-Threaded Komponenten umfassen meist mehrere public Interface-Methoden und private Implementierungs-Methoden, welche den Zustand der Komponente verändern können. Um Race Conditions zu verhindern, kann ein internes Lock benutzt werden. So können Aufrufe der öffentlichen Methoden serialisiert werden. Dies funktioniert super, solange all diese Methoden in sich geschlossen funktionieren. Meistens rufen sie sich aber gegenseitig auf, dann kommen folgende Anforderungen auf:
+
+\begin{itemize}
+  \item Avoid Self-deadlock: Threadsafe Komponenten sollten so konzipiert sein, dass sie self-Deadlocks vermeiden. Self-Deadlocks treten dann auf, wenn eine Komponentenmethode ein nicht-rekursives Lock sperrt und dann eine weitere Methode in derselben Komponente aufruft, welche erneut versucht, das Lock zu sperren.
+  \item Minimal locking overhead: Threadsafe Komponenten sollten so designt sein, dass sie nur den nötigsten Locking-Overhead (zur Vermeidung von Race Conditions) verursachen. Wenn ein rekursives Lock ausgewählt wurde um das Selbst-Deadlocking zu vermeiden, wird mehr Overhead verursacht, weil mehrfach versucht wird, das Lock über mehrere komponenteninterne Methodenaufrufe zu sperren oder freigeben.
+\end{itemize}
+
+\section{Solution}
+Erstelle alle Komponenten, welche interne Methodenaufrufe bearbeiten, nach den folgenden Konventionen:
+\begin{itemize}
+  \item Interface-Methoden prüfen: Alle Interface-Methoden (public), sollten mit dem Lock nur an der "Grenze" der Komponente interagieren. Sobald das Lock gesperrt wurde, sollte unmittelbar zu einer Implementations-Methode übergegangen werden, welche die tatsächliche Funktionalität erledigt. Nachdem diese fertig ist (return), sollte die Interface-Methode das Lock wieder freigeben, bevor die Kontrolle wieder an den Aufrufer zurückgegeben wird.
+  \item Implementations-Methoden vertrauen. Implementations-Methoden (private und protected) sollten nur Arbeit verrichten, wenn sie von Interface-Methoden aufgerufen werden. Sie "vertrauen" quasi darauf, dass sie nur aufgerufen werden, wenn das/die notwendigen Locks bereits gesperrt wurden und sollten selbst nie Locks sperren oder freigeben sollen. Implementations-Methoden sollen auch nie nach "oben" Aufrufe tätigen, also Interface-Methoden aufrufen, da diese die Locks sperren.
+\end{itemize}
+
+\subsection{Variant: Thread Safe Facade}
+Benutze eine Facade, um einen einzigen Einstiegspunkt für verschiedene Komponenten oder ein ganzes Subsystem anzubieten. Wenn diese Komponenten jeweils bereits eigene Strategien haben, um Concurrency zu vermeiden, sollte es allerdings unterlassen werden, um Nested Monitor Lockout zu vermeiden.
+
+\section{Consequences}
+\begin{itemize}
+    \pro{Robuster: Selbst-Deadlocks kommen nicht vor bei internen Aufrufen}
+    \pro{Performanter: Unnötiges Sperren und Freigeben von Locks wird verhindert}
+    \pro{Einfacher: Separation of concern auf Methodenebene, Interface-Methoden kümmern sich ums checken, Implementations-Methoden um die Arbeit.}
+    \con{Zusätzliche Indirection und mehr Methoden: Jede Interface- benötigt mindestens eine Implementations-Methode, welches die Komponente aufblähen kann. Natürlich kann die Implementationsmethode auch inline gehalten werden.}
+    \con{Potentielle Deadlocks: Das Problem von Deadlocks ist mit diesem Pattern immer noch nicht ganz gelöst, z.B. bei Methodenaufrufen über mehrere Komponenten hinweg.}
+    \con{Potentiell "misbrauchbar": Je nach Sprache kann ein Objekt der gleichen Klasse dessen private Methoden trotzdem direkt aufrufen und die Interface-Methoden umgehen.}
+\end{itemize}
+
+\section{Known Uses}
+\begin{itemize}
+  \item Java: java.util.collections enthält viele Beispiel, z.B. SynchronizedMap, welches aus lauter Interface-Methoden besteht und intern eigentlich nur eine Map besitzt.
+  \item Passkontrollen: Real-World-Beispiel - Man wird (theoretisch) nur beim Einreisen in ein Land genau kontrolliert, innerhalb des Landes wird dann angenommen, dass man sich legal dort aufhält.
+\end{itemize}
+
+\section{Relationships}
+

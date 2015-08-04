@@ -1,0 +1,58 @@
+\chapter{Leader Followers}
+
+\section{Summary}
+Das Leader/Follower-Designpattern stellt ein Concurrency-Model zur Verfügung in welchem mehrere Threads Event-Handlers von verschiedenen I/O-Handles demultiplexen können.
+
+\section{Context}
+Eine Applikation, wo Events von I/O-Handles auftreten und effizient von mehreren Threads demultiplexed und verteilt werden müssen.
+
+\section{Problem}
+Wenn man Requests nebenläufig verarbeiten will, könnte man dies mit einem Half-Sync/Half-Reactive Ansatz lösen. Dieser verwendet Select() um jeweils einen Request auszulesen und in eine synchronisierte Queue einzufügen. (Monitor Object) Dort können nun alle Worker Threads zugreifen und ihre Arbeit abholen.
+
+Hier ist allerdings ein grosser Nachteil vorhanden, da das auslesen mit Select nur von EINEM Thread gemacht warden kann und immer wieder Context Switches stattfinden.
+
+Man könnte natürlich auch einen Proactor verwenden, dieser ermöglicht ja komplettes Async. Da hier mehrere Events gleichzeitig verarbeitet werden können. Allerdings ist dies vielfach schlecht im Betriebssystem umgesetzt und deshalb langsam.
+
+\section{Solution}
+Erlaube zu einem Zeitpunkt nur einem Thread (dem Leader), darauf zu warten, dass ein Event auf einem Set von I/O-Handles auftritt. Die anderen (Followers) können sich unterdessen "anstellen" um später Leader zu werden. Nachdem der momentane Leader ein I/O-Event demultiplexed hat, befördert er den nächsten Follower zum Leader und reicht den Event an den entsprechenden Handler weiter, welcher den Event bearbeitet. Hier können der alte und der neue Leader gleichzeitig (concurrently) arbeiten.
+
+Genauer: Mehrere ehemalige Leaders können gleichzeitig Events weiterreichen, während der aktuelle Leader auf den nächsten Event wartet.
+
+Wenn die Events schneller ankommen als die verfügbaren Threads sie abarbeiten können, kann das darunterliegende I/O-System die Events aufqueuen bis ein Leader wieder frei wird.
+
+Der Leader muss eventuell den Event an einen Follower weitergeben, wenn ihm der nötige Kontext fehlt. Dies kann z.B. vorkommen, wenn Antworten in anderer Reihenfolge erscheinen als die Requests abgesetzt wurden und das "Thread-Specific Storage"-Pattern eingesetzt wurde, wo zwingend derselbe Thread die Antwort bearbeiten muss, welche die Anfrage geschickt hat.
+\subsection{Structure}
+\begin{figure}[H]
+  \centering
+  \includesvg[width=0.5\textwidth]{13-leader_followers-class-diagram}
+  \caption{Strukturdiagram f\"ur Leader Followers}
+\end{figure}
+\begin{itemize}
+  \item Handles: Identifizieren eine I/O-Ressource, z.B. Socket-Verbindungen oder geöffnete Dateien. Sind meistens vom Betriebssystem zur Verfügung gestellt und verwaltet.
+  \item Handle Set: Eine Collection von I/O-Handles, welche benutzt werden kann, um auf ein Event zu warten.
+  \item Event-Handler: Spezifiziert ein Interface, welches aus 1+ Hook-Methoden besteht, welche ein Set von verfügbaren Operationen repräsentieren, welche benutzt werden können um Applikations- oder Service-Spezifische Events auf den entsprechenden Handles zu bearbeiten.
+  \item Konkreter Event-Handler: Implementieren einen spezifischen Service, welcher von der Applikation angeboten wird. Jeder konkrete Event-Handler ist mit einem Handle assoziiert welcher den Service identifiziert.
+  \item Leader/Follower Thread Set: Beinhaltet die Threads, welche Leader oder Follower sein können. Das Set kann implizit verwaltet werden, z.B. mit Semaphoren, oder explizit, etwa mit einer Collection-Klasse.
+\end{itemize}
+
+\subsection{Dynamics}
+\begin{figure}[H]
+  \centering
+  \includesvg[width=0.8\textwidth]{13-leader_followers-sequence-diagram}
+  \caption{Sequenzdiagramm f\"ur Leader Followers}
+\end{figure}
+Wenn ein Thread zum Pool stösst und noch kein anderer Thread vorhanden ist, wird er Leader. Sollten andere Threads vorhanden sein, stellt er sich hinten an (Following). Als Leader wartet der Thread auf ein Event, sobald eines auftritt, bearbeitet er dieses (Processing) und jemand anders wird Leader. Ist er fertig mit bearbeiten und es ist kein Leader vorhanden, wird er zum Leader, andernfalls wird er zum Follower. Als Follower wartet der Thread darauf, Leader zu werden oder vom Leader ein Event zu erhalten, falls dieser es nicht bearbeiten kann.
+
+\section{Consequences}
+\begin{itemize}
+    \pro{Weitere Conrete Event Handler können hinzugefügt werden ohne bestehende Event Handler zu beeinflussen}
+    \pro{Minimiert Latenz aufgrund mehrerer Threads}
+    \con{Höhere Komplexität}
+    \con{Netzerk IO kann ein Engpass sein}
+\end{itemize}
+
+\section{Known Uses}
+\begin{itemize}
+    \item Taxistand: Der vordeste Fahrer ist der Leader
+  \end{itemize}
+

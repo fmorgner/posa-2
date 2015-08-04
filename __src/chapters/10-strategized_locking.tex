@@ -1,0 +1,52 @@
+\chapter{Strategized Locking}
+
+\section{Context}
+C++ Software die verschiedene Locking-Strategien verwenden möchte.
+
+\section{Problem}
+Wenn eine Klasse verschiedene Locking-Strategien verwenden möchte, braucht sie eigentlich mehrere Implementationen. Es muss dann z.B. eine Klasse erstellt werden, welche mit Mutex lockt und eine mit Semaphoren. Damit wird Code dupliziert, was die bekannten Nachteile mit sich bringt. Ausserdem musste der Ersteller einer solchen Klasse immer selbst entscheiden, welche Locking-Strategie er den nun verwenden will.
+
+\section{Solution}
+Es gibt zwei Lösungsansätze.
+
+\subsection{Polymorphism}
+\begin{figure}[H]
+  \centering
+  \includesvg[width=0.5\textwidth]{10-strategized_locking-class-diagram}
+  \caption{Strukturdiagramm f\"ur Strategized Locking (Polymorph)}
+\end{figure}
+Sinnvoll wenn zur \textbf{Laufzeit} entschieden werden soll welche Strategie verwendet werden soll. Es kann wie folgt verwendet werden:
+\begin{lstlisting}[language=C++]
+Lock lock{Mutex{}};
+MyClass myInstance{lock};
+\end{lstlisting}
+
+\subsection{Parametrization}
+Hier wird einfach eine Lock Klasse als Template-Argument übergeben. z.B.
+\begin{lstlisting}[language=C++]
+MyClass<Mutex> myInstance{}
+\end{lstlisting}
+
+Der konkrete Typ des eingesetzen Locks kann auch durch die Erstellung eines Typ-Alias (z.B. via using) vor dem Verwender verborgen werden:
+\begin{lstlisting}[language=C++]
+using MyClassThreadSafe = MyClass<Mutex>;
+MyClassThreadSafe myInstance{};
+\end{lstlisting}
+
+Dies macht nur Sinn, wenn schon zur \textbf{Compile-Zeit} bekannt ist welche Strategie verwendet werden soll. Falls keine der implementierten Synchronisations-Varianten zutreffen soll, kann man sich auch ein Null-Mutex (Beispiel eines Null-Objects) bauen.  Man muss sicherstellen, dass alle Concrete-Lock Implementationen die gleiche Signatur (acquire()/release()) besitzen.  Normalerweise macht man das, indem man Concrete Locks das "Wrapper Facade" Pattern verwenden laesst.
+
+\section{Consequences}
+\begin{itemize}
+    \pro{Mehr Flexibilität}
+    \pro{Mehr Performance}
+    \pro{Weniger Maintenance-Aufwand für Komponenten}
+    \con{Obtrusive Locking (aufdringliches Locking): Um das zu umgehen, kann anstatt des parametrisierten Locking Verfahrens, das polymorphe Locking verwendet werden.}
+\end{itemize}
+
+\section{Known Uses}
+\begin{itemize}
+  \item Booch Components: C++ Library
+  \item ACE OO Toolkit (Adaptive Communication Environment): Eine C++ Library, welches verschiedene, platformunabhaengige Concurrency-Modelle unterstuetzt
+  \item AOP (Aspect Oriented Programming / Ein Programmierparadigma welches Modularitaet fördert) ist generell Verwandt, dort geht es darum zusaetzliches Verhalten einem bestehenden Code anzuhaengen, ohne den Code selbst zu veraendern.
+\end{itemize}
+

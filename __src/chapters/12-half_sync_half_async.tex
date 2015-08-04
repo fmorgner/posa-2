@@ -1,0 +1,55 @@
+\chapter{Half Sync Half Async}
+
+\section{Context}
+Das Half-Sync/Half-Async entkoppelt synchronen I/O von asynchronem I/O innerhalb eines Systems um "Concurrent Programming"-Aufwand zu vereinfachen ohne die Effizienz der Ausführung zu beeinflussen.
+
+\section{Problem}
+Man möchte es möglichst einfach haben um zu programmieren. Asynchrone I/O Programmierung kann relativ schwierig werden weil Input-/Output-Operationen von einem Interrupt angestossen werden. Asynchronität kann ausserdem Race-Conditions auslösen
+
+Interrupt-gesteuerte Applikationen verlangen zusätzliche Datenstrukturen zum run-time stack. Diese Strukturen werden verwendet um Status zu speichern wenn Events (Interrupts) asynchron auftreten.
+
+Da externe Events zu unterschiedlichen Zeitpunkten während der Programmausführung auftreten, wird das Debugging erschwert. Synchrone I/O Modelle sind hingegen viel einfacher zu realisieren, da Events immer zu einem bestimmten Zeitpunkt im Programmfluss auftreten. (Nachteil: blockierend)
+
+Durch Asynchronität wird der context-switching overhead minimiert weil die Menge an Informationen die benötigt wird um den Programmstatus zu unterhalten relative gering ist. Man kann Kommunikation und Berechnungen parallel voneinander laufen lassen Zusammenfassend Ein komplett synchrones I/O Modell kann sehr ineffizient sein, wenn jede Eventquelle (Netzwerkadapter, Terminal, Timer, …) mit einem anderen aktiven Objekt (Prozess / Thread) verknüpft ist.
+Jedes dieser aktiven Objekte benötigt gewisse Ressourcen (Stack, Register) welche blockierend sein können, wenn sie auf ihre Eventquelle warten.
+
+\section{Solution}
+Aufteilung der Aufgaben in verschiedene Layer. Aufgaben welche von kurzer Dauer sind und es wichtig ist, dass sie asynchron ablaufen, also nicht blockieren, werden hier von den länger dauernden blockierenden Aufgaben getrennt. Damit die Layer untereinander kommunizieren können werden die Layer durch eine Queue miteinander verbunden.
+\subsection{Dynamics}
+Folgende Beschreibung zeigt die Beteiligten im Half Sync / Half Async Pattern:
+\begin{itemize}
+  \item Synchronous Service Layer: Dient der Ausführung von High-Level-Tasks, welche Active Objects und somit in ihrem eigenen Thread laufen. Diese können während der Ausführung blockieren.
+  \item Queueing-Layer: Ermöglicht die Kommunikation zwischen dem Synchronous und dem Asynchronous Service. Funktioniert nach dem Producer/Consumer Pattern und ist zuständig dafür die anderen Layer beim Eintreffen einer Nachricht zu informieren.
+  \item Asynchronous Service Layer: Behandelt Low-Level-Events von mehreren externen Ressourcen. Da die Tasks in diesem Layer passive Objekte sind dürfen diese auf keinen Fall blockieren.
+  \item External Event Source: Lösen Events aus, auf welche der asynchrone Layer reagiert(z.B. Netzwerkinterfaces oder Disk Controller).
+\end{itemize}
+\begin{figure}[H]
+  \centering
+  \includesvg[width=0.5\textwidth]{12-half_sync_half_async-sequence-diagram}
+  \caption{Sequenzdiagramm f\"ur Half Sync Half Async}
+\end{figure}
+\subsection{Example}
+Performance-sensitive Applikationen (z.B. in der Aviatik) führen oft eine Mischung aus synchronen und asynchronen Prozessen aus um verschiedene Typen von Anwendungen, Services und Hardware zu koordinieren. Gleiches gilt auch für Betriebssysteme: Das Verarbeiten von Protokollen beim UNIX-Kernel läuft z.B. asynchron, weil I/O-Geräte via Interrupts funktionieren welche durch die Netzwerk-Interface-Hardware getriggert werden. Wenn der Kernel diese asynchronen Interrupts NICHT sofort abarbeitet, kann es sein dass die Hardware falsch funktioniert und Pakete verliert oder den Memory-Buffer korrumpiert.
+
+Um kompliziertes asynchrones Programmieren zu verhindern, werden aber abstraktere (higher level) Services meist synchron laufen, z.B. FTP oder Telnet. Diese benutzen synchrone System calls (read, write), welche das System blockieren. Dies ermöglicht es den Entwicklern, Zustandsinformationen während dem Call zu behalten und die Ausführungsreihenfolge ist vorgegeben durch die Reihenfolge der Aufrufe.
+
+Innerhalb eines Betriebssystems sind synchrone und asynchrone Prozesse meistens nicht unabhängig. Application-Level Internet-Services, welche synchron ablaufen, müssen mit Kernel-Level asynchronem Protokoll-Processing kooperieren. Beispiel: synchrones read() (System Call) wird von HTTP-Server aufgerufen, welcher indirekt mit dem asynchronen Empfangen und Bearbeiten von Daten übers Network-Interface koopieriert.
+
+\section{Consequences}
+\begin{itemize}
+    \pro{Programmierer müssen sich nicht um das Interrupt Handling kümmern.}
+    \pro{Synchrone Threads können auf Prozessoren verteilt werden.}
+    \pro{Separation of Concerns (wie immer :-) ) Dies bezieht sich hier vor allem auf die Synchronisationsmechanismen. Im Synchronen Layer können die bekannten Mechanismen wie z.B. Monitor eingesetzt werden. Auf dem Async-Layer braucht es dann andere.}
+    \con{Performance-Einbusse beim kopieren von Daten zwischen den Layern. (Kann mit geshartem Memory behoben werden.)}
+    \con{Higher-Level Code kann nicht mehr direkt auf I/O zugreifen.}
+    \con{Debuging so schwierig wie bei Proactor und Reactor}
+\end{itemize}
+
+\section{Known Uses}
+\begin{itemize}
+  \item UNIX Networking Subsystems: I/O in den Networking Subsystems wird asynchron gehandelt und über Interrupts getriggert. I/O für Applikationen ist aber synchron.
+  \item CORBA, ACE, Conduit
+  \item Real Life: Restaurants! Setzen oft eine Variante des Half-Sync/Half-Async-Patterns ein. Ein "Host" ist zuständig um Besucher zu begrüssen und kümmert sich um die Reihenfolge, in welcher die Gäste ankamen und wer wann wo platziert wird, er wird also quasi von allen Gästen geteilt und kann nicht allzuviel Zeit mit jedem einzelnen Gast verbringen. Sobald eine Gruppe von Gästen aber einmal platziert wurde, ist ihnen ein Kellner zugeordnet und kümmert sich dann um sie.
+  \item Motorola Iridium-Satelliten benutzen das Pattern auch, um Messages zwischen Satellit und Bodenstation zu routen.
+\end{itemize}
+
