@@ -1,0 +1,76 @@
+\chapter{Active Object}
+
+\section{Context}
+Zugriff auf Objekte, welche in einem separaten Thread laufen.
+
+\section{Problem}
+Viele Applikationen verwenden eine Multithreading Umgebung, um die Qualität ihres Services zu verbessern. Bei einem passive Objekt läuft die aufgerufene Methode im Thread des Aufrufers, das Active Object hat jedoch einen eigenen Thread, in welchem die aufgerufenen Methode abgearbeitet wird. Falls ein solches Active Object parallel genutzt wird muss es eine Synchronisation zwischen den Aufrufern geben und dies führt zu den folgenden Anforderungen:
+\begin{itemize}
+  \item Rechenintensive Methoden, sollten den Thread nicht für unbestimmte Zeit blockieren.
+  \item Die Anwendung sollte so konzipiert werden, dass sie die verfügbaren Parallelisierungsmechanismen der Plattform wirksam einsetzen können.
+  \item Der synchronisierte Zugriff soll möglichst einfach gestaltet sein.
+\end{itemize}
+
+\section{Solution}
+Wie jedes andere Objekt enthält das Active Object private Daten und aufrufbare Methoden. Der Unterschied jedoch ist, wenn ein Caller eine Methode aufruft, wird der Aufruf lediglich als Message in eine Queue auf dem Active Object gelegt und kommt sofort zum Aufrufer zurück. So sind die Aufrufe immer nonblocking und asynchron.
+
+Weil die Messages sequentiell verarbeitet werden, sind sie untereinander atomar, man braucht also keine synchronität/monitors/mutex/...
+\subsection{Dynamics}
+\begin{figure}[H]
+  \centering
+  \includesvg[width=0.7\textwidth]{07-active_object-sequence-diagram}
+  \caption{Sequenzdiagramm f\"ur Active Object}
+\end{figure}
+\subsubsection{Komponenten}
+\textbf{Proxy (Interface)}
+\begin{itemize}
+  \item bietet ein Interface an, welches den Clients erlaubt, public Methoden auf einem Active Object aufzurufen.
+  \item wenn ein Client eine Methode aufruft, welche vom PROXY angeboten wird, wird ein Method Request erstellt und dieser in die Activation Queue gelegt, welche vom SCHEDULER verwaltet wird.
+\end{itemize}
+\textbf{Servant}
+\begin{itemize}
+  \item definiert das Verhalten und den Zustand des Active Objects
+  \item implementiert die im PROXY definierten Methoden und die dazugehoerigen Methoden-Requests
+  \item Seine Methoden werden aufgerufen durch einen Scheduler, sind also im gleichen Thread of Control
+  \item Kann zusaetzliche Methoden anbieten, welche von Method-Requests verwendet werden um ihre guards zu implementieren
+\end{itemize}
+\textbf{Method Request (abstrakt)}
+\begin{itemize}
+  \item die "Method Request"-Klasse definiert eine Schnittstelle um Methoden auf einem Active Object auszufuehren
+  \item Uebergibt Context Informationen ueber einen spezifischen Methodenaufruf an einen Proxy, sowie Parameter und Code von einem PROXY zum SCHEDULER.
+  \item Sie enthaelt guard-Methoden um conditions/constraints zu pruefen wenn eine Methode ausgefuehrt werden soll, die dequeued wurde
+\end{itemize}
+\textbf{Scheduler}
+\begin{itemize}
+  \item Laeuft in einem separaten Thread als seine Clients. Er verwaltet die Activation Queue der Methoden-Anfragen. Er entscheidet aufgrund unterschiedlicher Kriterien: Einfuegeordnung, synchronization constratints (Erfuellen gewisser Constraints/ Auftreten von spezifischen Events -> guards), frei werdender Platz im Buffer wenn ein Element entfernt wird
+\end{itemize}
+\textbf{Activation Queue}
+\begin{itemize}
+  \item enthaelt einen "bounded buffer" von ausstehenden Methoden-Anfragen, welche vom PROXY erstellt wurde. Hier wird entschieden, welche Methode als naechstes ausgefuehrt wird. Zudem wird dadurch Client Thread und "Servant"-Thread (also der Ausfuehrende) entkoppelt, sodass diese nebenlaeufig ablaufen koennen.
+\end{itemize}
+\textbf{Future}
+\begin{itemize}
+  \item ein Future erlaubt es dem Client, die Ergebnisse eines Methodenaufrufes abzuholen, sobald der Servant die Methode ausgefuehrt hat
+\end{itemize}
+
+\section{Consequences}
+\begin{itemize}
+    \pro{Erhöht Concurrency der Applikation und verringert Komplexität der Synchronisation}
+    \pro{Verfügbare Parallelisierungsmöglichkeiten ausnutzen}
+    \pro{Ausführungsreihenfolge kann unterschiedlich zur Aufrufreihenfolge sein}
+    \con{Performance-Overhead}
+    \con{Komplziertes Debuggen}
+\end{itemize}
+
+\section{Known Uses}
+Java Timer und TimerTask verwenden das Active Object Pattern. Es ist dort möglich dem Timer(eigener Thread) einen TimerTask zu übergeben. Gleichzeitig gibt man auch an unter welchen Bedingungen(Guards) der Task ausgeführt wird z.B. Delay.
+
+Auch bei RMI(Remote Method Invocation) sieht man etwas ähnliches wie ein Active Object, dort ist auch der Aufruf von der Ausführung getrennt. Active Object kann aber auch selbst RMI verwenden, falls die Methode nicht nur in einem anderen Thread sondern auch auf einem entfernten System ausgeführt werden soll.
+
+\section{Exam Questions}
+\begin{itemize}
+  \item Das Active-Object-Pattern eignet sich insbesondere für viele kleine Objekte. - Falsch
+  \item Heisenbugs sind Bugs, welche durch Einnahme von Bewusstseinserweiternden Substanzen einfacher zu lösen sind. - Falsch
+\end{itemize}
+
+
