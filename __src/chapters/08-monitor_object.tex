@@ -1,0 +1,54 @@
+\chapter{Monitor Object}
+
+\section{Summary}
+Monitor-Pattern synchronisiert nebenläufige Methodenausführung um sicherzustellen, dass nur eine Methode gleichzeitig in einem Objekt läuft. Es ermöglicht auch, dass die Ausführung der Methoden eines Objekts kooperativ geplant werden.
+Auch bekannt als "Thread-safe passive Object" (Wir erinnern uns: Passive Object = Objekt auf dem eine Methode ausgeführt wird)
+
+\section{Context}
+Mehrere Threads greifen gleichzeitig auf ein Objekt zu
+
+\section{Problem}
+Viele Anwendungen enthalten Objekte, deren Methoden nebenläufig von mehreren Client-Threads aufgerufen werden. Diese Methoden ändern oft den Zustand ihrer Objekte. Um solche Applikationen nebenläufig UND korrekt laufen zu lassen, ist es notwendig, den Zugriff auf diese Objekte zu synchronisieren und zu planen.
+Dazu beachtet man 4 Punkte:
+\begin{enumerate}
+  \item Um Verantwortungen und Aufgaben zu trennen und den internen Zustand von Objekten von unbefugtem Zugriff zu schützen, sind sich OOP-Programmierer oft gewöhnt, nur durch Interface-Methoden auf Objekte zuzugreifen. So ist es relativ einfach, Daten eines Objekts von unkontrollierten, nebenläufigen Änderungen zu schützen (Stichwort: Race Conditions). Die Interface-Methoden eines Objekts sollten dessen Synchronisationsgrenzen definieren und nur eine Methode soll gleichzeitig ablaufen.
+  \item Nebenläufige Applikationen sind schwerer zu programmieren wenn Clients explizit Low-Level Synchronisationsmechanismen wie Semaphore oder Mutexes verlangen und freigeben müssen. Objekte sollten daher selbst verantwortlich sein, dass Methoden von ihm, welche synchronisiert werden müssen, transparent serialisiert werden, ohne dass der Client intervenieren muss.
+  \item Wenn eine Objektmethode während ihrer Ausführung blockieren muss, sollte sie in der Lage sein, den ausführenden Thread freiwillig wieder freizugeben, so dass Methoden, welche von anderen Threads aufgerufen wurden, ebenfalls auf das Objekt zugreifen können. Dies hilft Deadlocks zu vermeiden und ermöglicht es, bereits existierende Concurrency-Mechanismen der zugrundeliegenden Hard- oder Software zu benutzen.
+  \item Wenn eine Methode den Thread of Control freiwillig aufgibt, muss sie das Objekt in einem stabilen Zustand hinterlassen. Objekt-spezifische Invarianz muss gültig sein! Das gilt auch umgekehrt: eine Methode darf die Ausführung innerhalb eines Objekts nur dann weiterführen, wenn es in einem stabilen Zustand ist.
+\end{enumerate}
+
+\section{Solution}
+Synchronisiere den Zugriff auf die Methoden eines Objekts, so dass nur eine Methode gleichzeitig ausgeführt werden kann.
+
+Im Detail: Definiere jedes Objekt, auf welches nebenläufig von mehreren Client-Threads zugegriffen wird, als ein "Monitor-Objekt". Clients können auf die Funktionen (!=Methoden) eines Monitor-Objekts nur durch die bereitgestellten, synchronisierten Methoden zugreifen. Um Race-Conditions auf den internen Zustand zu verhindern, kann nur eine synchronisierte Methode zu einer bestimmten Zeit darin ausgeführt werden. Um nebenläufigen Zugriff auf seinen Zustand zu verhindern, enthält jedes Monitor-Objekt einen "Monitor Lock". Synchronisierte Methoden können die Zeitpunkte bestimmen, wenn sie ihre Ausführung anhalten und fortfahren, basierend auf einer oder mehreren "Monitor Conditions", welche zum Monitor-Objekt gehören.
+\subsection{Structure}
+\begin{figure}[H]
+  \centering
+  \includesvg[width=0.4\textwidth]{08-monitor_object-class-diagram}
+  \caption{Strukturdiagramm f\"ur Monitor Object}
+\end{figure}
+Vier Teilnehmer:
+\begin{itemize}
+  \item Monitor-Objekt: Exportiert eine oder mehrere Methoden. Um den internen Zustand des Monitor-Objekts vor unkontrollierten Änderungen und Race Conditions zu schützen, müssen alle Clients auf das Monitor-Objekt NUR durch diese Methoden zugreifen. Jede Methode wird im Thread des Clients ausgeführt, welches sie aufrief, weil ein Monitor-Objekt keinen eigenen Thread besitzt (es ist ein passives Objekt, siehe auch letzte Woche).
+  \item Synchronisierte Methoden: Implementieren die thread-sicheren Funktionen (Funktionalitäten) welche von einem Monitor-Objekt angeboten werden. Um Race Conditions zu vermeiden, kann nur eine synchronisierte Methode innerhalb eines Monitor-Objektes zur gleichen Zeit ausgeführt werden. Dies ist unabhängig von der Anzahl der aufrufenden Threads oder der Anzahl der synchronisierten Methoden. Es kann nur einen geben.
+  \item Monitor Lock: Synchronisierte Methoden benutzen den Monitor Lock um Methodenaufrufe zu serialisieren, und zwar für jedes Objekt separat. Jede synchronisierte Methode muss den Monitor Lock für sein Objekt anfordern und freigeben wenn er es "betritt" oder "verlässt".
+  \item Monitor Condition: Mehrere Synchronisierte Methoden welche auf separaten Threads laufen, können ihre Ausführungsreihenfolge gemeinsam (kooperativ) planen, indem sie aufeinander warten und sich gegenseitig über Monitor Conditions benachrichtigen. Synchronisierte Methoden benutzen ihr Monitor Lock in Verbindung mit einer oder mehreren Monitor Conditions um die Bedingungen zu bestimmen, unter welchen sie ihre Verarbeitung pausieren oder fortsetzen sollen.
+\end{itemize}
+
+\section{Consequences}
+\begin{itemize}
+    \pro{Vereinfachung der Synchronisation, da das Locking transparent passiert, wird der Aufruf nicht erschwert.}
+    \pro{Durch die Monitor Conditions ist es möglich die Ausführung mehrer Monitor Objekte kooperativ zu gestalten. Da diese genau wissen unter welchen Umständen sie pausieren oder ihre Arbeit fortsetzen sollen.}
+    \pro{Scalability: kann eingeschränkt werden, wenn nur ein Monitor Lock benutzt wird und sehr viele Clients darau zugreifen wollen.}
+    \con{Die Synchronisations und Scheduling Logik eines Monitor Objekts ist oft eng an die Funktionalität der Methoden gekoppelt, deshalb ist dessen Erweiterbarkeit erschwert.}
+    \con{Erschwerte Vererbung, da oft Subklassen nicht die gleiche Synchronisationssemantik benötigen.}
+    \con{Nested Monitor Lockout: Ruft ein Monitor-Objekt eine Methode aus einem anderen Monitor-Objekt auf, wird sichergestellt, dass die Monitor-Locks für beide Objekte gehalten werden. Wird im zweiten Monitor-Objekt jedoch wait aufgerufen, dann wird nur der Monitor-Lock des zweiten Monitor-Objektes freigegeben. Der Monitor-Lock des ersten Monitor-Objektes hält weiterhin der nun schlafen gelegte Thread. Dies kann zu Deadlocks führen. Als Lösung hierfür, können gesharte Monitor-Condition oder Lock-Objekte verwendet werden.}
+\end{itemize}
+
+\section{Known Uses}
+\begin{itemize}
+  \item Monitore gemäss Dijkstra, Hoare
+  \item Java Objects: der generelle Synchronisationsmechanismus in Java basiert auf Monitors gemäss Dijkstra/Hoare. Jedes Java-Objekt kann ein Monitor-Objekt sein und ein Monitor Lock und eine einzelne Monitor Condition enthalten.
+  \item Real-Life Example: Fast-Food-Restaurant - Wenn man eine Bestellung in einem beschäftigten Fast-Food-Restaurant aufgibt, setzt man das Monitor-Object-Pattern ein. Kunden sind die Clients, welche darauf warten, ihre Bestellung beim Kassierer einzugeben. Nur ein Kunde kann gleichzeitig mit dem Kassierer interagieren. Wenn die Bestellung nicht sofort ausgeführt werden kann, wartet der Kunde daneben und lässt temporär andere Kunden vor, so dass sie ihre Bestellung loswerden können. Wenn die Bestellung bereit ist, stellt sich der betroffene Kunde vorne in die Warteschlange und holt sein Essen vom Kassierer.
+\end{itemize}
+
