@@ -1,0 +1,45 @@
+\chapter{Scoped Locking}
+
+\section{Context}
+Wir befinden uns in einer Multithreading Umgebung, wo mehrere Threads gleichzeitig auf die selbe Ressource zugreiffen wollen.
+
+\section{Problem}
+Um Race Conditions zu vermeiden muss der Zugriff auf diese Ressource synchronisiert werden. Es muss also ein Locking realisiert werden. Das Problem dabei ist es sicherzustellen, dass ein bezogener lock (aquire()) auch wieder richtig freigegeben wird. In C++ kann der Scope auf mehre Wege verlassen werden. Dazu gehören return, break, continue, goto oder auch unbehandelte Exceptions, welche aus dem Scope herauspropagiert werden.
+
+\section{Solution}
+Es wird eine Klasse erstellt welche im Konstrukor den Lock bezieht und im Destruktor den Lock wieder freigibt.
+Hier ein kleines Beispiel:
+\begin{lstlisting}[language=C++]
+struct scoped_lock : boost::noncopyable
+  {
+  scoped_lock(mutex_impl & mtx ) : _mtx{mtx} 
+    { 
+    _mtx.lock();
+    }
+
+  ~scoped_lock() 
+    { 
+    _mtx.unlock();
+    }
+
+  private:
+    std::mutex &_mtx;
+};
+
+
+void do_something()
+  {
+  scoped_lock lock{shared_mutex_obj}; //Lock beziehen
+
+  //CRITICAL SECTION
+
+  } //Lock freigeben da hier der Destruktor von scoped_lock aufgerufen wird.
+\end{lstlisting}
+
+\section{Consequences}
+\begin{itemize}
+  \pro{Robustheit: Durch das automatische acquire() und release() könne Programmierfehler verhindert werden und so für robusten Code gesorgt werden.}
+  \con{Self-Deadlock: Wenn eine Methode, die den Lock acquired sich selbst rekursiv aufruft. So führt es zu einem Deadlock, wenn das Lock-Objekt nicht für rekursive Locks gemacht ist.}
+  \con{Einschränkungen durch Sprachspezifische Semantik: Das Scoped Locking Idiom baut auf C++ Sprachfeatures auf. Nicht bei allen Sprachen wird beim Ende eines Scopes das Objekt direkt freigegeben. Dort kann also dieser Ansatz nicht verwendet werden.}
+  \end{itemize}
+
